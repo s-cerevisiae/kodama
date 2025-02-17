@@ -5,29 +5,40 @@ use crate::process::processer::FootnoteCounter;
 
 #[derive(Debug, PartialEq)]
 pub enum State {
-    None, // writable
-
+    /// Writable state
+    None,
     Embed,
-    Shared,      // shared for inline typst
-    InlineTypst, // typst
-    ImageSpan,   // display: inline
-    ImageBlock,  // display: block; text-align: center
+
+    /// Shared for inline typst
+    Shared,
+
+    /// Inline typst
+    InlineTypst, 
+
+    /// `display: inline`
+    ImageSpan,
+
+    /// `display: block; text-align: center`
+    ImageBlock,
+
+    /// `ImageBlock` with `<details>` code
+    ImageCode,
+
     Metadata,
-
     Figure,
-
     LocalLink,
     ExternalLink,
 }
 
 impl State {
-    pub fn strify(&self) -> &str {
+    pub const fn strify(&self) -> &str {
         match self {
             State::None => "none",
             State::Embed => "embed",
             State::InlineTypst => "inline",
             State::ImageSpan => "span",
             State::ImageBlock => "block",
+            State::ImageCode => "code",
             State::Metadata => "metadata",
             State::LocalLink => "local",       // style class name
             State::ExternalLink => "external", // style class name

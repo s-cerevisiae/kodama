@@ -1,7 +1,9 @@
+use std::fs;
+
 use crate::{
     compiler::section::LazyContent,
     config::{self, join_path, output_path, parent_dir},
-    html_flake::html_figure,
+    html_flake::{html_figure, html_figure_code},
     recorder::{ParseRecorder, State},
     slug::adjust_name,
     typst_cli::{self, write_svg, InlineConfig},
@@ -27,6 +29,9 @@ impl Processer for TypstImage {
                     recorder.push(dest_url.to_string()); // [0]
                 } else if action == State::ImageBlock.strify() {
                     recorder.enter(State::ImageBlock);
+                    recorder.push(url.to_string());
+                } else if action == State::ImageCode.strify() {
+                    recorder.enter(State::ImageCode);
                     recorder.push(url.to_string());
                 } else if action == State::ImageSpan.strify() {
                     recorder.enter(State::ImageSpan);
@@ -120,6 +125,33 @@ impl Processer for TypstImage {
                     let html = html_figure(&config::full_url(&img_src), true, caption);
                     return Some(LazyContent::Plain(html));
                 }
+                State::ImageCode => {
+                    let typst_url = recorder.data.get(0).unwrap().as_str();
+                    let caption = match recorder.data.len() > 1 {
+                        true => recorder.data[1..].join(""),
+                        false => String::new(),
+                    };
+                    let typst_url = config::relativize(typst_url);
+                    let (parent_dir, filename) = parent_dir(&typst_url);
+
+                    let mut svg_url = adjust_name(&filename, ".typ", ".svg");
+                    let img_src = join_path(&parent_dir, &svg_url);
+                    svg_url = output_path(&img_src);
+
+                    match write_svg(&typst_url, &svg_url) {
+                        Err(err) => eprintln!("{:?} at {}", err, recorder.current),
+                        Ok(_) => (),
+                    }
+                    recorder.exit();
+
+                    let root_dir = config::root_dir();
+                    let full_path = config::join_path(&root_dir, &typst_url);
+                    let code = fs::read_to_string(format!("{}.code", full_path))
+                        .unwrap_or_else(|_| fs::read_to_string(full_path).unwrap());
+
+                    let html = html_figure_code(&config::full_url(&img_src), caption, code);
+                    return Some(LazyContent::Plain(html));
+                }
                 State::Shared => {
                     let typst_url = recorder.data.get(0).unwrap().as_str();
                     let imported = recorder.data.get(1);
@@ -149,8 +181,7 @@ impl Processer for TypstImage {
         recorder: &mut ParseRecorder,
         _metadata: &mut std::collections::HashMap<String, String>,
     ) {
-        if allow_inline(&recorder.state)
-        {
+        if allow_inline(&recorder.state) {
             // [1]: imported / inline typst / span / block
             return recorder.push(s.to_string());
         }
@@ -179,6 +210,7 @@ fn allow_inline(state: &State) -> bool {
         || *state == State::InlineTypst
         || *state == State::ImageSpan
         || *state == State::ImageBlock
+        || *state == State::ImageCode
 }
 
 pub fn is_inline_typst(dest_url: &str) -> bool {

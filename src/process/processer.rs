@@ -45,6 +45,7 @@ pub trait Processer {
 
 pub type FootnoteCounter = HashMap<String, usize>;
 
+/// split `url#:action` to `(url, action)`
 pub fn url_action(dest_url: &CowStr<'_>) -> (String, String) {
     if let Some(pos) = dest_url.find("#:") {
         let base = &dest_url[0..pos];

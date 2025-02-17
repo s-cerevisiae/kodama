@@ -108,6 +108,17 @@ pub fn html_figure(image_src: &str, center: bool, caption: String) -> String {
     html!(figure => (html_image(image_src)) (caption))
 }
 
+pub fn html_figure_code(image_src: &str, caption: String, code: String) -> String {
+    let mut caption = caption;
+    if !caption.is_empty() {
+        caption = html!(figcaption => (caption))
+    }
+    let figure = html!(figure => (html_image(image_src)) (caption));
+    let pre = html!(pre => (code));
+    let details = html!(details => (html!(summary => (figure))) (pre));
+    details
+}
+
 pub fn html_link(href: &str, title: &str, text: &str, class_name: &str) -> String {
     html!(span class = format!("link {}", class_name) => 
       (html!(a href = {href}, title = {title} => {text})))
