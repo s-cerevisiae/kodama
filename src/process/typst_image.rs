@@ -6,7 +6,7 @@ use crate::{
     html_flake::{html_figure, html_figure_code},
     recorder::{ParseRecorder, State},
     slug::adjust_name,
-    typst_cli::{self, write_svg, InlineConfig},
+    typst_cli::{self, source_to_inline_html, write_svg, InlineConfig},
 };
 use pulldown_cmark::{Tag, TagEnd};
 
@@ -27,17 +27,20 @@ impl Processer for TypstImage {
                 if is_inline_typst(dest_url) {
                     recorder.enter(State::InlineTypst);
                     recorder.push(dest_url.to_string()); // [0]
-                } else if action == State::ImageBlock.strify() {
-                    recorder.enter(State::ImageBlock);
-                    recorder.push(url.to_string());
                 } else if action == State::ImageCode.strify() {
                     recorder.enter(State::ImageCode);
                     recorder.push(url.to_string());
-                } else if action == State::ImageSpan.strify() {
-                    recorder.enter(State::ImageSpan);
+                } else if action == State::Html.strify() {
+                    recorder.enter(State::Html);
                     recorder.push(url.to_string());
                 } else if action == State::Shared.strify() {
                     recorder.enter(State::Shared);
+                    recorder.push(url.to_string());
+                } else if action == State::ImageBlock.strify() {
+                    recorder.enter(State::ImageBlock);
+                    recorder.push(url.to_string());
+                } else if action == State::ImageSpan.strify() {
+                    recorder.enter(State::ImageSpan);
                     recorder.push(url.to_string());
                 }
             }
@@ -48,6 +51,26 @@ impl Processer for TypstImage {
     fn end(&mut self, tag: &TagEnd, recorder: &mut ParseRecorder) -> Option<LazyContent> {
         if tag == &TagEnd::Link {
             match recorder.state {
+                State::Html => {
+                    let typst_url = recorder.data.get(0).unwrap().as_str();
+                    let typst_url = config::relativize(typst_url);
+                    let (parent_dir, filename) = parent_dir(&typst_url);
+
+                    let mut html_url = adjust_name(&filename, ".typ", ".html");
+                    let img_src = join_path(&parent_dir, &html_url);
+                    html_url = output_path(&img_src);
+
+                    let html = match source_to_inline_html(&typst_url, &html_url) {
+                        Ok(inline_html) => inline_html,
+                        Err(err) => {
+                            eprintln!("{:?} at {}", err, recorder.current);
+                            String::new()
+                        },
+                    };
+
+                    recorder.exit();
+                    return Some(LazyContent::Plain(html));
+                }
                 State::InlineTypst => {
                     let shareds = recorder.shareds.join("\n");
                     let args: Vec<&str> = recorder.data.get(0).unwrap().split("-").collect();
@@ -208,6 +231,7 @@ impl Processer for TypstImage {
 fn allow_inline(state: &State) -> bool {
     *state == State::Shared
         || *state == State::InlineTypst
+        || *state == State::Html
         || *state == State::ImageSpan
         || *state == State::ImageBlock
         || *state == State::ImageCode

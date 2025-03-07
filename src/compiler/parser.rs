@@ -12,7 +12,7 @@ use super::{
     CompileError, HTMLContent, ShallowSection,
 };
 
-const OPTIONS: Options = Options::ENABLE_MATH
+pub const OPTIONS: Options = Options::ENABLE_MATH
     .union(Options::ENABLE_YAML_STYLE_METADATA_BLOCKS)
     .union(Options::ENABLE_TABLES)
     .union(Options::ENABLE_SMART_PUNCTUATION)
@@ -31,7 +31,7 @@ pub fn initialize(
     let recorder = ParseRecorder::new(fullname);
     match std::fs::read_to_string(&markdown_path) {
         Err(err) => Err(CompileError::IO(
-            Some("parser::initialize".to_owned()),
+            Some(concat!(file!(), '#', line!())),
             err,
             markdown_path,
         )),
