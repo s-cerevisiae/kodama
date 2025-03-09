@@ -17,7 +17,7 @@ pub fn source_to_inline_html(typst_path: &str, html_path: &str) -> Result<String
     let full_path = config::join_path(&root_dir, typst_path);
     let html = source_to_html(&full_path, &root_dir)?;
     let html_body = html_to_body_content(&html);
-    
+
     fs::write(html_path, html)?;
     println!(
         "Compiled to HTML: {}",
@@ -88,12 +88,7 @@ pub fn source_to_html(full_path: &str, root_dir: &str) -> Result<String, std::io
         stdout.to_string()
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        eprintln!(
-            "Command failed in {} {}: \n  {}",
-            full_path, 
-            concat!(file!(), '#', line!()),
-            stderr
-        );
+        failed_in_file(concat!(file!(), '#', line!()), &full_path, stderr);
         String::new()
     })
 }
@@ -135,6 +130,37 @@ pub fn compile_source(
     })
 }
 
+pub fn file_to_html(typst_path: &str, root_dir: &str) -> Result<String, std::io::Error> {
+    compile_file(typst_path, root_dir, "html", Some("--features=html"))
+        .map(|s| html_to_body_content(&s))
+}
+
+pub fn compile_file(
+    typst_path: &str,
+    root_dir: &str,
+    output_format: &str,
+    extra: Option<&str>,
+) -> Result<String, std::io::Error> {
+    let output = Command::new("typst")
+        .arg("c")
+        .arg(format!("-f={}", output_format))
+        .arg(format!("--root={}", root_dir))
+        .args(extra)
+        .arg(typst_path.to_string())
+        .arg("-")
+        .stdout(std::process::Stdio::piped())
+        .output()?;
+
+    Ok(if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        stdout.to_string()
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        failed_in_file(concat!(file!(), '#', line!()), &typst_path, stderr);
+        String::new()
+    })
+}
+
 /// typst file to svg (`stdout -> disk`)
 pub fn write_svg(typst_path: &str, svg_path: &str) -> Result<(), std::io::Error> {
     if !verify_and_file_hash(typst_path)? && Path::new(svg_path).exists() {
@@ -164,12 +190,7 @@ pub fn write_svg(typst_path: &str, svg_path: &str) -> Result<(), std::io::Error>
         );
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        eprintln!(
-            "Command failed in {} {}: \n  {}",
-            full_path, 
-            concat!(file!(), '#', line!()),
-            stderr
-        );
+        failed_in_file(concat!(file!(), '#', line!()), &full_path, stderr);
     }
     Ok(())
 }
@@ -181,4 +202,13 @@ fn thematize(s: std::borrow::Cow<'_, str>) -> String {
         &s[0..index],
         html_flake::html_typst_style()
     )
+}
+
+fn failed_in_file(src_pos: &'static str, file_path: &str, stderr: std::borrow::Cow<'_, str>) {
+    eprintln!(
+        "Command failed in {}: \n  In file {}, {}",
+        src_pos,
+        file_path,
+        stderr
+    );
 }
