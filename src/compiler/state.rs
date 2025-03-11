@@ -115,9 +115,7 @@ impl CompileState {
                             let link_slug = &local_link.slug;
                             let article_title = self
                                 .get_metadata(&link_slug)
-                                .unwrap()
-                                .page_title()
-                                .map_or("", |s| s);
+                                .map_or("", |s| s.page_title().map_or("", |s| s));
 
                             if self.is_reference(&link_slug) {
                                 references.insert(link_slug.to_string());
