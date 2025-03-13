@@ -1,7 +1,6 @@
-use std::{collections::HashSet, mem};
-
-use fancy_regex::Regex;
+use regex_lite::Regex;
 use serde::{Deserialize, Serialize};
+use std::{collections::HashSet, mem, sync::LazyLock};
 
 use crate::entry::{EntryMetaData, HTMLMetaData, MetaData};
 
@@ -69,6 +68,7 @@ pub enum HTMLContent {
 }
 
 impl HTMLContent {
+    #[allow(dead_code)]
     pub fn as_str(&self) -> Option<&str> {
         if let HTMLContent::Plain(s) = self {
             Some(s)
@@ -85,37 +85,44 @@ impl HTMLContent {
         }
     }
 
-    fn remove_tags(s: &str) -> String {
-        let attrs = r#"(\s+[a-zA-Z]+="([^"\\]|\\[\s\S])*")*"#;
-        let re = Regex::new(&format!(
-            r#"<[A-Za-z]+{}>|</[A-Za-z]+>|<[A-Za-z]+{}/>"#,
-            attrs, attrs
-        ))
-        .unwrap();
-        let mut cursor = 0;
-        let mut string = String::new();
-        for capture in re.captures_iter(s).map(Result::unwrap) {
-            let all = capture.get(0).unwrap();
-            string.push_str(&s[cursor..all.start()]);
-            cursor = all.end();
-        }
-        string.push_str(&s[cursor..]);
-        string
-    }
+    pub fn remove_all_tags(&self) -> String {
+        static RE_TAGS: LazyLock<Regex> = LazyLock::new(|| {
+            let attrs = r#"(\s+[a-zA-Z-]+(="([^"\\]|\\[\s\S])*")?)*"#;
+            Regex::new(&format!(r#"<[A-Za-z]+{}\s*/?>|</[A-Za-z]+>"#, attrs)).unwrap()
+        });
 
-    pub fn to_text(&self) -> String {
+        let remove_tag = |s| {
+            let mut cursor = 0;
+            let mut string = String::new();
+            for capture in RE_TAGS.captures_iter(s) {
+                let all = capture.get(0).unwrap();
+                string.push_str(&s[cursor..all.start()]);
+                cursor = all.end();
+            }
+            string.push_str(&s[cursor..]);
+            string
+        };
+
         match self {
-            HTMLContent::Plain(s) => HTMLContent::remove_tags(s),
+            HTMLContent::Plain(s) => remove_tag(s),
             HTMLContent::Lazy(contents) => {
                 let mut str = String::new();
                 for content in contents {
-                    match content {
-                        LazyContent::Plain(s) => str.push_str(&HTMLContent::remove_tags(s)),
-                        LazyContent::Embed(embed) => str
-                            .push_str(embed.title.as_ref().map(String::as_str).unwrap_or_default()),
-                        LazyContent::Local(local) => str
-                            .push_str(local.text.as_ref().map(String::as_str).unwrap_or_default()),
-                    }
+                    let s = match content {
+                        LazyContent::Plain(s) => remove_tag(s),
+                        LazyContent::Embed(embed) => embed
+                            .title
+                            .as_ref()
+                            .map(|s| remove_tag(s))
+                            .unwrap_or_default(),
+
+                        LazyContent::Local(local) => local
+                            .text
+                            .as_ref()
+                            .map(|s| remove_tag(s))
+                            .unwrap_or_default(),
+                    };
+                    str.push_str(&s);
                 }
                 str
             }
