@@ -92,13 +92,6 @@ pub fn should_ignored_dir(path: &Path) -> bool {
         .map_or(false, |s| s.starts_with('.') || s.starts_with('_'))
 }
 
-pub fn is_source(path: &Path) -> bool {
-    path.extension()
-        .and_then(|s| s.to_str())
-        .map(|s| matches!(s, "md" | "typst"))
-        .unwrap_or(false)
-}
-
 fn err_collide(path: &Path, ext: &Ext) -> std::io::Error {
     std::io::Error::new(
         std::io::ErrorKind::AlreadyExists,
@@ -115,14 +108,19 @@ fn err_collide(path: &Path, ext: &Ext) -> std::io::Error {
  */
 pub fn all_source_files(root_dir: &Path) -> Result<Workspace, std::io::Error> {
     let mut slug_exts = HashMap::new();
-    let to_slug_ext = |p: &Path| slug::path_to_slug(p.strip_prefix(root_dir).unwrap_or(p));
+    let to_slug_ext = |p: &Path| {
+        let p = p.strip_prefix(root_dir).unwrap_or(p);
+        let (slug, ext) = slug::path_to_slug(p);
+        Some((slug, ext?))
+    };
 
     for entry in std::fs::read_dir(root_dir)? {
         let path = entry?.path();
-        if path.is_file() && is_source(&path) && !should_ignored_file(&path) {
-            let (slug, ext) = to_slug_ext(&path);
-            // TODO: remove this expect and replace is_source with it
-            if let Some(ext) = slug_exts.insert(slug, ext.expect("invalid file extension")) {
+        if path.is_file() && !should_ignored_file(&path) {
+            let Some((slug, ext)) = to_slug_ext(&path) else {
+                continue;
+            };
+            if let Some(ext) = slug_exts.insert(slug, ext) {
                 return Err(err_collide(&path, &ext));
             };
         } else if path.is_dir() && !should_ignored_dir(&path) {
@@ -136,8 +134,9 @@ pub fn all_source_files(root_dir: &Path) -> Result<Workspace, std::io::Error> {
             {
                 let path = entry?.into_path();
                 if path.is_file() {
-                    let (slug, ext) = slug::path_to_slug(&path);
-                    let Some(ext) = ext else { continue };
+                    let Some((slug, ext)) = to_slug_ext(&path) else {
+                        continue;
+                    };
                     if let Some(ext) = slug_exts.insert(slug, ext) {
                         return Err(err_collide(&path, &ext));
                     }
