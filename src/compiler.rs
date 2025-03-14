@@ -1,12 +1,12 @@
 pub mod callback;
 pub mod counter;
+pub mod html_parser;
 pub mod parser;
 pub mod section;
 pub mod state;
 pub mod taxon;
 pub mod typst;
 pub mod writer;
-pub mod html_parser;
 
 use std::{collections::HashMap, fmt::Debug, path::Path};
 
@@ -14,11 +14,12 @@ use parser::parse_markdown;
 use section::{HTMLContent, ShallowSection};
 use state::CompileState;
 use typst::parse_typst;
+use walkdir::WalkDir;
 use writer::Writer;
 
 use crate::{
-    config::{self, files_match_with, verify_and_file_hash},
-    slug::{self, posix_style},
+    config::{self, verify_and_file_hash},
+    slug::{self, Ext},
 };
 
 #[allow(dead_code)]
@@ -55,10 +56,9 @@ pub fn compile_all(workspace_dir: &str) -> Result<(), CompileError> {
             let shallow: ShallowSection = serde_json::from_str(&serialized).unwrap();
             shallow
         } else {
-            let shallow = match ext.as_str() {
-                "md" => parse_markdown(slug)?,
-                "typst" => parse_typst(slug, workspace_dir)?,
-                _ => panic!(),
+            let shallow = match ext {
+                Ext::Markdown => parse_markdown(slug)?,
+                Ext::Typst => parse_typst(slug, workspace_dir)?,
             };
             let serialized = serde_json::to_string(&shallow).unwrap();
             std::fs::write(entry_path_buf, serialized).map_err(|e| {
@@ -99,10 +99,14 @@ pub fn is_source(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-fn err_collide(path: &String, ext: &String) -> std::io::Error {
+fn err_collide(path: &Path, ext: &Ext) -> std::io::Error {
     std::io::Error::new(
         std::io::ErrorKind::AlreadyExists,
-        format!("{} collides with another file with '.{}'", path, ext),
+        format!(
+            "{} collides with another file with '.{}'",
+            path.display(),
+            ext
+        ),
     )
 }
 
@@ -110,28 +114,35 @@ fn err_collide(path: &String, ext: &String) -> std::io::Error {
  * collect all source file paths in workspace dir
  */
 pub fn all_source_files(root_dir: &Path) -> Result<Workspace, std::io::Error> {
-    let root_dir_str = root_dir.to_str().unwrap();
-    let offset = root_dir_str.len();
     let mut slug_exts = HashMap::new();
-    let to_slug_ext = |s: String| slug::to_slug_ext(&s[offset..]);
+    let to_slug_ext = |p: &Path| slug::path_to_slug(p.strip_prefix(root_dir).unwrap_or(p));
 
     for entry in std::fs::read_dir(root_dir)? {
         let path = entry?.path();
         if path.is_file() && is_source(&path) && !should_ignored_file(&path) {
-            let path = posix_style(path.to_str().unwrap());
-            let (slug, ext) = to_slug_ext(path.to_string());
-            if let Some(ext) = slug_exts.insert(slug, ext) {
+            let (slug, ext) = to_slug_ext(&path);
+            // TODO: remove this expect and replace is_source with it
+            if let Some(ext) = slug_exts.insert(slug, ext.expect("invalid file extension")) {
                 return Err(err_collide(&path, &ext));
             };
         } else if path.is_dir() && !should_ignored_dir(&path) {
-            files_match_with(
-                &path,
-                &is_source,
-                &should_ignored_dir,
-                &mut slug_exts,
-                &to_slug_ext,
-                &err_collide,
-            )?;
+            for entry in WalkDir::new(&path)
+                .follow_links(true)
+                .into_iter()
+                .filter_entry(|e| {
+                    let path = e.path();
+                    path.is_file() || !should_ignored_dir(path)
+                })
+            {
+                let path = entry?.into_path();
+                if path.is_file() {
+                    let (slug, ext) = slug::path_to_slug(&path);
+                    let Some(ext) = ext else { continue };
+                    if let Some(ext) = slug_exts.insert(slug, ext) {
+                        return Err(err_collide(&path, &ext));
+                    }
+                }
+            }
         }
     }
 
@@ -140,5 +151,5 @@ pub fn all_source_files(root_dir: &Path) -> Result<Workspace, std::io::Error> {
 
 #[derive(Debug)]
 pub struct Workspace {
-    pub slug_exts: HashMap<String, String>,
+    pub slug_exts: HashMap<String, Ext>,
 }
