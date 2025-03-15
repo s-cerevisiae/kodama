@@ -9,7 +9,7 @@ mod recorder;
 mod slug;
 mod typst_cli;
 
-use std::fs;
+use std::{fs, path::Path};
 
 use clap::Parser;
 use config::{output_path, CompileConfig, FooterMode};
@@ -131,30 +131,25 @@ fn main() {
                 ),
             );
 
-            let cache_dir = &config::get_cache_dir();
+            let cache_dir = config::get_cache_dir();
+
+            let path_ends_with =
+                |suffix: &'static str| move |p: &Path| p.to_string_lossy().ends_with(suffix);
 
             clean_command.markdown.then(|| {
-                let _ = config::delete_all_with(&cache_dir, &|s| {
-                    s.to_str().unwrap().ends_with(".md.hash")
-                });
+                let _ = config::delete_all_with(&cache_dir, &path_ends_with(".md.hash"));
             });
 
             clean_command.typ.then(|| {
-                let _ = config::delete_all_with(&cache_dir, &|s| {
-                    s.to_str().unwrap().ends_with(".typ.hash")
-                });
+                let _ = config::delete_all_with(&cache_dir, &path_ends_with(".typ.hash"));
             });
 
             clean_command.typst.then(|| {
-                let _ = config::delete_all_with(&cache_dir, &|s| {
-                    s.to_str().unwrap().ends_with(".typst.hash")
-                });
+                let _ = config::delete_all_with(&cache_dir, &path_ends_with(".typst.hash"));
             });
 
             clean_command.html.then(|| {
-                let _ = config::delete_all_with(&cache_dir, &|s| {
-                    s.to_str().unwrap().ends_with(".html.hash")
-                });
+                let _ = config::delete_all_with(&cache_dir, &path_ends_with(".html.hash"));
             });
         }
     }
