@@ -68,7 +68,7 @@ pub fn compile_all(workspace_dir: &str) -> eyre::Result<()> {
         shallows.insert(slug.to_string(), shallow);
     }
 
-    let state = state::compile_all(shallows);
+    let state = state::compile_all(shallows)?;
 
     Writer::write_needed_slugs(
         &workspace.slug_exts.into_iter().map(|x| x.0).collect(),

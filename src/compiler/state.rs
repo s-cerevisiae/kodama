@@ -1,5 +1,7 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 
+use eyre::OptionExt;
+
 use crate::{
     config,
     entry::{EntryMetaData, HTMLMetaData, MetaData, KEY_SLUG},
@@ -21,7 +23,7 @@ pub struct CompileState {
 
 type Shallows = HashMap<String, ShallowSection>;
 
-pub fn compile_all(mut shallows: Shallows) -> CompileState {
+pub fn compile_all(mut shallows: Shallows) -> eyre::Result<CompileState> {
     for shallow in shallows.values_mut() {
         shallow.metadata.compute_textual_attrs();
     }
@@ -29,7 +31,9 @@ pub fn compile_all(mut shallows: Shallows) -> CompileState {
     let residued: BTreeSet<String> = shallows.keys().cloned().collect();
 
     let mut state = CompileState::new(residued);
-    state.compile(&shallows, "index");
+    state
+        .compile(&shallows, "index")
+        .ok_or_eyre("missing `index` section, please provide `index.md` or `index.typst`")?;
 
     /*
      * Unlinked or unembedded pages.
@@ -38,7 +42,7 @@ pub fn compile_all(mut shallows: Shallows) -> CompileState {
         state.compile(&shallows, &slug);
     }
 
-    state
+    Ok(state)
 }
 
 impl CompileState {
@@ -50,8 +54,8 @@ impl CompileState {
         }
     }
 
-    fn compile(&mut self, shallows: &Shallows, slug: &str) -> &Section {
-        self.fetch_section(shallows, slug).unwrap()
+    fn compile(&mut self, shallows: &Shallows, slug: &str) -> Option<&Section> {
+        self.fetch_section(shallows, slug)
     }
 
     fn fetch_section(&mut self, shallows: &Shallows, slug: &str) -> Option<&Section> {
