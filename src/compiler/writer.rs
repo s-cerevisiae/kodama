@@ -38,7 +38,7 @@ impl Writer {
     pub fn write_needed_slugs(all_slugs: &Vec<String>, state: &CompileState) {
         all_slugs
             .iter()
-            .for_each(|slug| match state.compiled.get(slug) {
+            .for_each(|slug| match state.compiled().get(slug) {
                 /*
                  * No need for `state.compiled.remove(slug)` here,
                  * because writing to a file does not require a mutable reference
@@ -62,7 +62,7 @@ impl Writer {
         let slug = section.slug();
         let html_header = Writer::header(state, &slug);
 
-        let callback = state.callback.0.get(&slug);
+        let callback = state.callback().0.get(&slug);
         let footer_html = Writer::footer(state, &section.references, callback);
         let page_title = section.metadata.page_title().map_or("", |s| s.as_str());
 
@@ -79,12 +79,12 @@ impl Writer {
 
     fn header(state: &CompileState, slug: &str) -> String {
         state
-            .callback
+            .callback()
             .0
             .get(slug)
             .and_then(|callback| {
                 let parent = &callback.parent;
-                state.compiled.get(parent).map(|section| {
+                state.compiled().get(parent).map(|section| {
                     let href = config::full_html_url(parent);
                     let title = section.metadata.title().map_or("", |s| s);
                     let page_title = section.metadata.page_title().map_or("", |s| s);
@@ -106,7 +106,7 @@ impl Writer {
             .iter()
             .map(|slug| {
                 let slug = slug.to_string();
-                let section = state.compiled.get(&slug).unwrap();
+                let section = state.compiled().get(&slug).unwrap();
                 Writer::footer_section_to_html(section)
             })
             .reduce(|s, t| s + &t)
@@ -121,7 +121,7 @@ impl Writer {
                     .iter()
                     .map(|slug| {
                         let slug = Writer::clip_metadata_badge(slug);
-                        let section = state.compiled.get(&slug).unwrap();
+                        let section = state.compiled().get(&slug).unwrap();
                         Writer::footer_section_to_html(section)
                     })
                     .reduce(|s, t| s + &t)

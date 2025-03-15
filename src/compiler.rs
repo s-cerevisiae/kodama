@@ -13,7 +13,6 @@ use std::{collections::HashMap, fs::File, io::BufReader, path::Path};
 use eyre::{bail, eyre, WrapErr};
 use parser::parse_markdown;
 use section::{HTMLContent, ShallowSection};
-use state::CompileState;
 use typst::parse_typst;
 use walkdir::WalkDir;
 use writer::Writer;
@@ -24,8 +23,8 @@ use crate::{
 };
 
 pub fn compile_all(workspace_dir: &str) -> eyre::Result<()> {
-    let mut state = CompileState::new();
     let workspace = all_source_files(Path::new(workspace_dir))?;
+    let mut shallows = HashMap::new();
 
     for (slug, ext) in &workspace.slug_exts {
         let relative_path = format!("{}.{}", slug, ext);
@@ -66,10 +65,10 @@ pub fn compile_all(workspace_dir: &str) -> eyre::Result<()> {
             shallow
         };
 
-        state.residued.insert(slug.to_string(), shallow);
+        shallows.insert(slug.to_string(), shallow);
     }
 
-    state.compile_all();
+    let state = state::compile_all(shallows);
 
     Writer::write_needed_slugs(
         &workspace.slug_exts.into_iter().map(|x| x.0).collect(),
