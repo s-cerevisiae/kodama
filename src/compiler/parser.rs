@@ -1,6 +1,7 @@
 use std::{collections::HashMap, vec};
 
 use pulldown_cmark::{html, CowStr, Event, Options, Tag, TagEnd};
+use snafu::ResultExt;
 
 use crate::{
     config::input_path, entry::HTMLMetaData, process::processer::Processer, recorder::ParseRecorder,
@@ -8,7 +9,7 @@ use crate::{
 
 use super::{
     section::{LazyContent, LazyContents},
-    CompileError, HTMLContent, ShallowSection,
+    CompileError, HTMLContent, IOSnafu, ShallowSection,
 };
 
 pub const OPTIONS: Options = Options::ENABLE_MATH
@@ -28,14 +29,11 @@ pub fn initialize(
     // local contents recorder
     let markdown_path = input_path(&fullname);
     let recorder = ParseRecorder::new(fullname);
-    match std::fs::read_to_string(&markdown_path) {
-        Err(err) => Err(CompileError::IO(
-            Some(concat!(file!(), '#', line!())),
-            err,
-            markdown_path,
-        )),
-        Ok(markdown_input) => Ok((markdown_input, metadata, recorder)),
-    }
+    std::fs::read_to_string(&markdown_path)
+        .map(|markdown_input| (markdown_input, metadata, recorder))
+        .context(IOSnafu {
+            file: &markdown_path,
+        })
 }
 
 pub fn parse_markdown(slug: &str) -> Result<ShallowSection, CompileError> {

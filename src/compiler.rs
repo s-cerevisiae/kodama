@@ -8,26 +8,19 @@ pub mod taxon;
 pub mod typst;
 pub mod writer;
 
-use std::{collections::HashMap, fmt::Debug, path::Path};
+use std::{collections::HashMap, path::Path};
 
 use parser::parse_markdown;
 use section::{HTMLContent, ShallowSection};
+use snafu::ResultExt;
 use state::CompileState;
 use typst::parse_typst;
 use walkdir::WalkDir;
 use writer::Writer;
 
 use crate::{
-    config::{self, verify_and_file_hash},
-    slug::{self, Ext},
+    config::{self, verify_and_file_hash}, error::{CompileError, IOSnafu}, slug::{self, Ext}
 };
-
-#[allow(dead_code)]
-#[derive(Debug)]
-pub enum CompileError {
-    IO(Option<&'static str>, std::io::Error, String),
-    Syntax(Option<&'static str>, Box<dyn Debug>, String),
-}
 
 pub fn compile_all(workspace_dir: &str) -> Result<(), CompileError> {
     let mut state = CompileState::new();
@@ -36,21 +29,16 @@ pub fn compile_all(workspace_dir: &str) -> Result<(), CompileError> {
     for (slug, ext) in &workspace.slug_exts {
         let relative_path = format!("{}.{}", slug, ext);
 
-        let is_modified = verify_and_file_hash(&relative_path).map_err(|e| {
-            CompileError::IO(
-                Some(concat!(file!(), '#', line!())),
-                e,
-                relative_path.to_string(),
-            )
+        let is_modified = verify_and_file_hash(&relative_path).context(IOSnafu {
+            file: &relative_path,
         })?;
 
         let entry_path_str = format!("{}.entry", relative_path);
         let entry_path_buf = config::entry_path(&entry_path_str);
 
         let shallow = if !is_modified && entry_path_buf.exists() {
-            let serialized = std::fs::read_to_string(entry_path_buf).map_err(|e| {
-                let position = Some(concat!(file!(), '#', line!()));
-                CompileError::IO(position, e, entry_path_str)
+            let serialized = std::fs::read_to_string(entry_path_buf).context(IOSnafu {
+                file: &entry_path_str,
             })?;
 
             let shallow: ShallowSection = serde_json::from_str(&serialized).unwrap();
@@ -61,8 +49,8 @@ pub fn compile_all(workspace_dir: &str) -> Result<(), CompileError> {
                 Ext::Typst => parse_typst(slug, workspace_dir)?,
             };
             let serialized = serde_json::to_string(&shallow).unwrap();
-            std::fs::write(entry_path_buf, serialized).map_err(|e| {
-                CompileError::IO(Some(concat!(file!(), '#', line!())), e, entry_path_str)
+            std::fs::write(entry_path_buf, serialized).context(IOSnafu {
+                file: entry_path_str,
             })?;
 
             shallow

@@ -1,6 +1,7 @@
 mod compiler;
 mod config;
 mod entry;
+mod error;
 mod html_flake;
 mod html_macro;
 mod process;
@@ -112,9 +113,8 @@ fn main() {
                 export_css_files()
             }
 
-            match compiler::compile_all(root) {
-                Err(err) => eprintln!("{:?}", err),
-                Ok(_) => (),
+            if let Err(e) = compiler::compile_all(root) {
+                report_error(e);
             }
         }
         Command::Clean(clean_command) => {
@@ -173,5 +173,14 @@ fn export_css_file(css_content: &str, name: &str) {
             Err(err) => eprintln!("{:?}", err),
             Ok(_) => (),
         }
+    }
+}
+
+fn report_error<E: snafu::Error + snafu::ErrorCompat>(e: E) {
+    eprint!("{}", snafu::Report::from_error(&e));
+    if let Some(trace) = snafu::ErrorCompat::backtrace(&e) {
+        eprintln!("backtrace:\n{trace}");
+    } else {
+        eprintln!("note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace");
     }
 }

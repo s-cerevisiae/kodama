@@ -1,7 +1,8 @@
 use pulldown_cmark::{Tag, TagEnd};
 
 use crate::{
-    compiler::{section::{HTMLContent, LazyContent}, CompileError},
+    compiler::section::{HTMLContent, LazyContent},
+    error::CompileError,
     recorder::{ParseRecorder, State},
 };
 

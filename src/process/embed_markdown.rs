@@ -5,8 +5,8 @@ use crate::{
     compiler::{
         parser::parse_spanned_markdown,
         section::{EmbedContent, HTMLContent, LazyContent, LocalLink, SectionOption},
-        CompileError,
     },
+    error::CompileError,
     html_flake::html_link,
     recorder::{ParseRecorder, State},
     slug::to_slug,
