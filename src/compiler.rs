@@ -10,9 +10,9 @@ pub mod writer;
 
 use std::{collections::HashMap, fs::File, io::BufReader, path::Path};
 
+use eyre::{bail, eyre, WrapErr};
 use parser::parse_markdown;
 use section::{HTMLContent, ShallowSection};
-use snafu::ResultExt;
 use state::CompileState;
 use typst::parse_typst;
 use walkdir::WalkDir;
@@ -20,41 +20,47 @@ use writer::Writer;
 
 use crate::{
     config::{self, verify_and_file_hash},
-    error::{CompileError, DeserializeEntrySnafu, FileCollisonSnafu, IOSnafu},
     slug::{self, Ext},
 };
 
-pub fn compile_all(workspace_dir: &str) -> Result<(), CompileError> {
+pub fn compile_all(workspace_dir: &str) -> eyre::Result<()> {
     let mut state = CompileState::new();
     let workspace = all_source_files(Path::new(workspace_dir))?;
 
     for (slug, ext) in &workspace.slug_exts {
         let relative_path = format!("{}.{}", slug, ext);
 
-        let is_modified = verify_and_file_hash(&relative_path).context(IOSnafu {
-            path: &relative_path,
-        })?;
+        let is_modified = verify_and_file_hash(&relative_path)
+            .wrap_err_with(|| eyre!("failed to verify hash of `{relative_path}`"))?;
 
         let entry_path_str = format!("{}.entry", relative_path);
         let entry_path_buf = config::entry_path(&entry_path_str);
 
         let shallow = if !is_modified && entry_path_buf.exists() {
-            let entry_file = BufReader::new(File::open(&entry_path_buf).context(IOSnafu {
-                path: &entry_path_buf,
+            let entry_file = BufReader::new(File::open(&entry_path_buf).wrap_err_with(|| {
+                eyre!(
+                    "failed to open entry file at `{}`",
+                    entry_path_buf.display()
+                )
             })?);
             let shallow: ShallowSection =
-                serde_json::from_reader(entry_file).context(DeserializeEntrySnafu {
-                    path: &entry_path_buf,
+                serde_json::from_reader(entry_file).wrap_err_with(|| {
+                    eyre!(
+                        "failed to deserialize entry file at `{}`",
+                        entry_path_buf.display()
+                    )
                 })?;
             shallow
         } else {
             let shallow = match ext {
-                Ext::Markdown => parse_markdown(slug)?,
-                Ext::Typst => parse_typst(slug, workspace_dir)?,
+                Ext::Markdown => parse_markdown(slug).wrap_err("failed to parse markdown file")?,
+                Ext::Typst => {
+                    parse_typst(slug, workspace_dir).wrap_err("failed to parse typst file")?
+                }
             };
             let serialized = serde_json::to_string(&shallow).unwrap();
-            std::fs::write(entry_path_buf, serialized).context(IOSnafu {
-                path: entry_path_str,
+            std::fs::write(&entry_path_buf, serialized).wrap_err_with(|| {
+                eyre!("failed to write entry to `{}`", entry_path_buf.display())
             })?;
 
             shallow
@@ -87,7 +93,7 @@ pub fn should_ignored_dir(path: &Path) -> bool {
 /**
  * collect all source file paths in workspace dir
  */
-pub fn all_source_files(root_dir: &Path) -> Result<Workspace, CompileError> {
+pub fn all_source_files(root_dir: &Path) -> eyre::Result<Workspace> {
     let mut slug_exts = HashMap::new();
     let to_slug_ext = |p: &Path| {
         let p = p.strip_prefix(root_dir).unwrap_or(p);
@@ -95,14 +101,22 @@ pub fn all_source_files(root_dir: &Path) -> Result<Workspace, CompileError> {
         Some((slug, ext?))
     };
 
-    for entry in std::fs::read_dir(root_dir).context(IOSnafu { path: root_dir })? {
-        let path = entry.context(IOSnafu { path: root_dir })?.path();
+    let failed_to_read_dir = |dir: &Path| eyre!("failed to read directory `{}`", dir.display());
+    let file_collide = |p: &Path, e: Ext| {
+        eyre!(
+            "`{}` collides with `{}`",
+            p.display(),
+            p.with_extension(e.to_string()).display(),
+        )
+    };
+    for entry in std::fs::read_dir(root_dir).wrap_err_with(|| failed_to_read_dir(root_dir))? {
+        let path = entry.wrap_err_with(|| failed_to_read_dir(root_dir))?.path();
         if path.is_file() && !should_ignored_file(&path) {
             let Some((slug, ext)) = to_slug_ext(&path) else {
                 continue;
             };
             if let Some(ext) = slug_exts.insert(slug, ext) {
-                return FileCollisonSnafu { path: &path, ext }.fail();
+                bail!(file_collide(&path, ext));
             };
         } else if path.is_dir() && !should_ignored_dir(&path) {
             for entry in WalkDir::new(&path)
@@ -114,15 +128,14 @@ pub fn all_source_files(root_dir: &Path) -> Result<Workspace, CompileError> {
                 })
             {
                 let path = entry
-                    .map_err(|e| e.into())
-                    .context(IOSnafu { path: &path })?
+                    .wrap_err_with(|| failed_to_read_dir(&path))?
                     .into_path();
                 if path.is_file() {
                     let Some((slug, ext)) = to_slug_ext(&path) else {
                         continue;
                     };
                     if let Some(ext) = slug_exts.insert(slug, ext) {
-                        return FileCollisonSnafu { path, ext }.fail();
+                        bail!(file_collide(&path, ext));
                     }
                 }
             }

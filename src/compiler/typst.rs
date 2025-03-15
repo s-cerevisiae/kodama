@@ -1,11 +1,10 @@
-use snafu::{OptionExt, ResultExt};
+use eyre::{eyre, WrapErr};
 
 use super::html_parser::{HTMLParser, HTMLTagKind};
 use super::section::{EmbedContent, LocalLink, SectionOption};
 use super::section::{HTMLContent, HTMLContentBuilder, LazyContent};
 use super::ShallowSection;
 use crate::entry::HTMLMetaData;
-use crate::error::{CompileError, IOSnafu, MissingAttrSnafu, SyntaxSnafu};
 use crate::process::embed_markdown;
 use crate::slug::to_slug;
 use crate::typst_cli;
@@ -25,7 +24,7 @@ fn parse_typst_html(
     html_str: &str,
     relative_path: &str,
     metadata: &mut HashMap<String, HTMLContent>,
-) -> Result<HTMLContent, CompileError> {
+) -> eyre::Result<HTMLContent> {
     let mut builder = HTMLContentBuilder::new();
     let mut cursor: usize = 0;
 
@@ -36,10 +35,7 @@ fn parse_typst_html(
         let attr = |attr_name: &str| {
             span.attrs
                 .get(attr_name)
-                .context(MissingAttrSnafu { attr_name })
-                .context(SyntaxSnafu {
-                    file: relative_path,
-                })
+                .ok_or_else(|| eyre!("missing attribute `{attr_name}` in kodama tag"))
         };
 
         let value = || {
@@ -95,11 +91,10 @@ fn parse_typst_html(
     Ok(builder.build())
 }
 
-pub fn parse_typst(slug: &str, root_dir: &str) -> Result<ShallowSection, CompileError> {
+pub fn parse_typst(slug: &str, root_dir: &str) -> eyre::Result<ShallowSection> {
     let relative_path = format!("{}.typst", slug);
-    let html_str = typst_cli::file_to_html(&relative_path, root_dir).context(IOSnafu {
-        path: &relative_path,
-    })?;
+    let html_str = typst_cli::file_to_html(&relative_path, root_dir)
+        .wrap_err_with(|| eyre!("failed to compile typst file `{relative_path}` to html"))?;
 
     let mut metadata: HashMap<String, HTMLContent> = HashMap::new();
     metadata.insert("slug".to_string(), HTMLContent::Plain(slug.to_string()));

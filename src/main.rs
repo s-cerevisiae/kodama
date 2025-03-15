@@ -1,7 +1,6 @@
 mod compiler;
 mod config;
 mod entry;
-mod error;
 mod html_flake;
 mod html_macro;
 mod process;
@@ -9,10 +8,12 @@ mod recorder;
 mod slug;
 mod typst_cli;
 
+use config::{output_path, CompileConfig, FooterMode};
+
 use std::{fs, path::Path};
 
 use clap::Parser;
-use config::{output_path, CompileConfig, FooterMode};
+use eyre::eyre;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -114,7 +115,10 @@ fn main() {
             }
 
             if let Err(e) = compiler::compile_all(root) {
-                report_error(e);
+                eprintln!(
+                    "{:#}",
+                    e.wrap_err(eyre!("failed to compile project `{root}`"))
+                );
             }
         }
         Command::Clean(clean_command) => {
@@ -168,14 +172,5 @@ fn export_css_file(css_content: &str, name: &str) {
             Err(err) => eprintln!("{:?}", err),
             Ok(_) => (),
         }
-    }
-}
-
-fn report_error<E: snafu::Error + snafu::ErrorCompat>(e: E) {
-    eprint!("{}", snafu::Report::from_error(&e));
-    if let Some(trace) = snafu::ErrorCompat::backtrace(&e) {
-        eprintln!("backtrace:\n{trace}");
-    } else {
-        eprintln!("note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace");
     }
 }
