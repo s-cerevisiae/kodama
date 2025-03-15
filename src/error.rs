@@ -19,6 +19,12 @@ pub enum CompileError {
         ext: Ext,
         backtrace: Option<Backtrace>,
     },
+    #[snafu(display("failed to deserialize entry `{}`", path.display()))]
+    DeserializeEntry {
+        path: PathBuf,
+        source: serde_json::Error,
+        backtrace: Option<Backtrace>,
+    },
     #[snafu(display("failed to parse file `{file}`"))]
     Syntax {
         file: String,

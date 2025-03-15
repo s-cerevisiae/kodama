@@ -8,7 +8,7 @@ pub mod taxon;
 pub mod typst;
 pub mod writer;
 
-use std::{collections::HashMap, path::Path};
+use std::{collections::HashMap, fs::File, io::BufReader, path::Path};
 
 use parser::parse_markdown;
 use section::{HTMLContent, ShallowSection};
@@ -20,7 +20,7 @@ use writer::Writer;
 
 use crate::{
     config::{self, verify_and_file_hash},
-    error::{CompileError, FileCollisonSnafu, IOSnafu},
+    error::{CompileError, DeserializeEntrySnafu, FileCollisonSnafu, IOSnafu},
     slug::{self, Ext},
 };
 
@@ -39,11 +39,13 @@ pub fn compile_all(workspace_dir: &str) -> Result<(), CompileError> {
         let entry_path_buf = config::entry_path(&entry_path_str);
 
         let shallow = if !is_modified && entry_path_buf.exists() {
-            let serialized = std::fs::read_to_string(entry_path_buf).context(IOSnafu {
-                path: &entry_path_str,
-            })?;
-
-            let shallow: ShallowSection = serde_json::from_str(&serialized).unwrap();
+            let entry_file = BufReader::new(File::open(&entry_path_buf).context(IOSnafu {
+                path: &entry_path_buf,
+            })?);
+            let shallow: ShallowSection =
+                serde_json::from_reader(entry_file).context(DeserializeEntrySnafu {
+                    path: &entry_path_buf,
+                })?;
             shallow
         } else {
             let shallow = match ext {
