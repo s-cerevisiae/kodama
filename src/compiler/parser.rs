@@ -1,7 +1,7 @@
 use std::{collections::HashMap, vec};
 
+use eyre::{eyre, WrapErr};
 use pulldown_cmark::{html, CowStr, Event, Options, Tag, TagEnd};
-use snafu::ResultExt;
 
 use crate::{
     config::input_path, entry::HTMLMetaData, process::processer::Processer, recorder::ParseRecorder,
@@ -9,7 +9,7 @@ use crate::{
 
 use super::{
     section::{LazyContent, LazyContents},
-    CompileError, HTMLContent, IOSnafu, ShallowSection,
+    HTMLContent, ShallowSection,
 };
 
 pub const OPTIONS: Options = Options::ENABLE_MATH
@@ -20,7 +20,7 @@ pub const OPTIONS: Options = Options::ENABLE_MATH
 
 pub fn initialize(
     slug: &str,
-) -> Result<(String, HashMap<String, HTMLContent>, ParseRecorder), CompileError> {
+) -> eyre::Result<(String, HashMap<String, HTMLContent>, ParseRecorder)> {
     // global data store
     let mut metadata: HashMap<String, HTMLContent> = HashMap::new();
     let fullname = format!("{}.md", slug);
@@ -31,12 +31,10 @@ pub fn initialize(
     let recorder = ParseRecorder::new(fullname);
     std::fs::read_to_string(&markdown_path)
         .map(|markdown_input| (markdown_input, metadata, recorder))
-        .context(IOSnafu {
-            path: &markdown_path,
-        })
+        .wrap_err_with(|| eyre!("failed to read markdown file `{markdown_path}`"))
 }
 
-pub fn parse_markdown(slug: &str) -> Result<ShallowSection, CompileError> {
+pub fn parse_markdown(slug: &str) -> eyre::Result<ShallowSection> {
     let mut processers: Vec<Box<dyn Processer>> = vec![
         Box::new(crate::process::footnote::Footnote),
         Box::new(crate::process::figure::Figure),
@@ -64,7 +62,7 @@ pub fn parse_markdown(slug: &str) -> Result<ShallowSection, CompileError> {
 pub fn parse_spanned_markdown(
     markdown_input: &str,
     current_slug: &str,
-) -> Result<HTMLContent, CompileError> {
+) -> eyre::Result<HTMLContent> {
     let mut recorder = ParseRecorder::new(current_slug.to_owned());
 
     let mut processers: Vec<Box<dyn Processer>> = vec![
@@ -73,14 +71,13 @@ pub fn parse_spanned_markdown(
         Box::new(crate::process::embed_markdown::Embed),
     ];
 
-    let content = parse_content(
+    parse_content(
         &markdown_input,
         &mut recorder,
         &mut HashMap::new(),
         &mut processers,
         true,
-    )?;
-    return Ok(content);
+    )
 }
 
 pub fn parse_content(
@@ -89,7 +86,7 @@ pub fn parse_content(
     metadata: &mut HashMap<String, HTMLContent>,
     processers: &mut Vec<Box<dyn Processer>>,
     ignore_paragraph: bool,
-) -> Result<HTMLContent, CompileError> {
+) -> eyre::Result<HTMLContent> {
     let mut contents: LazyContents = vec![];
     let parser = pulldown_cmark::Parser::new_ext(&markdown_input, OPTIONS);
 
