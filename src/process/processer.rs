@@ -1,6 +1,10 @@
 use std::collections::HashMap;
 
-use crate::{compiler::{section::{HTMLContent, LazyContent}, CompileError}, recorder::ParseRecorder};
+use crate::{
+    compiler::section::{HTMLContent, LazyContent},
+    error::CompileError,
+    recorder::ParseRecorder,
+};
 use pulldown_cmark::{CowStr, Tag, TagEnd};
 
 pub trait Processer {

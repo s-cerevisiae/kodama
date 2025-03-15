@@ -8,10 +8,11 @@ pub mod taxon;
 pub mod typst;
 pub mod writer;
 
-use std::{collections::HashMap, fmt::Debug, path::Path};
+use std::{collections::HashMap, fs::File, io::BufReader, path::Path};
 
 use parser::parse_markdown;
 use section::{HTMLContent, ShallowSection};
+use snafu::ResultExt;
 use state::CompileState;
 use typst::parse_typst;
 use walkdir::WalkDir;
@@ -19,41 +20,32 @@ use writer::Writer;
 
 use crate::{
     config::{self, verify_and_file_hash},
+    error::{CompileError, DeserializeEntrySnafu, FileCollisonSnafu, IOSnafu},
     slug::{self, Ext},
 };
 
-#[allow(dead_code)]
-#[derive(Debug)]
-pub enum CompileError {
-    IO(Option<&'static str>, std::io::Error, String),
-    Syntax(Option<&'static str>, Box<dyn Debug>, String),
-}
-
 pub fn compile_all(workspace_dir: &str) -> Result<(), CompileError> {
     let mut state = CompileState::new();
-    let workspace = all_source_files(Path::new(workspace_dir)).unwrap();
+    let workspace = all_source_files(Path::new(workspace_dir))?;
 
     for (slug, ext) in &workspace.slug_exts {
         let relative_path = format!("{}.{}", slug, ext);
 
-        let is_modified = verify_and_file_hash(&relative_path).map_err(|e| {
-            CompileError::IO(
-                Some(concat!(file!(), '#', line!())),
-                e,
-                relative_path.to_string(),
-            )
+        let is_modified = verify_and_file_hash(&relative_path).context(IOSnafu {
+            path: &relative_path,
         })?;
 
         let entry_path_str = format!("{}.entry", relative_path);
         let entry_path_buf = config::entry_path(&entry_path_str);
 
         let shallow = if !is_modified && entry_path_buf.exists() {
-            let serialized = std::fs::read_to_string(entry_path_buf).map_err(|e| {
-                let position = Some(concat!(file!(), '#', line!()));
-                CompileError::IO(position, e, entry_path_str)
-            })?;
-
-            let shallow: ShallowSection = serde_json::from_str(&serialized).unwrap();
+            let entry_file = BufReader::new(File::open(&entry_path_buf).context(IOSnafu {
+                path: &entry_path_buf,
+            })?);
+            let shallow: ShallowSection =
+                serde_json::from_reader(entry_file).context(DeserializeEntrySnafu {
+                    path: &entry_path_buf,
+                })?;
             shallow
         } else {
             let shallow = match ext {
@@ -61,8 +53,8 @@ pub fn compile_all(workspace_dir: &str) -> Result<(), CompileError> {
                 Ext::Typst => parse_typst(slug, workspace_dir)?,
             };
             let serialized = serde_json::to_string(&shallow).unwrap();
-            std::fs::write(entry_path_buf, serialized).map_err(|e| {
-                CompileError::IO(Some(concat!(file!(), '#', line!())), e, entry_path_str)
+            std::fs::write(entry_path_buf, serialized).context(IOSnafu {
+                path: entry_path_str,
             })?;
 
             shallow
@@ -92,21 +84,10 @@ pub fn should_ignored_dir(path: &Path) -> bool {
         .map_or(false, |s| s.starts_with('.') || s.starts_with('_'))
 }
 
-fn err_collide(path: &Path, ext: &Ext) -> std::io::Error {
-    std::io::Error::new(
-        std::io::ErrorKind::AlreadyExists,
-        format!(
-            "{} collides with another file with '.{}'",
-            path.display(),
-            ext
-        ),
-    )
-}
-
 /**
  * collect all source file paths in workspace dir
  */
-pub fn all_source_files(root_dir: &Path) -> Result<Workspace, std::io::Error> {
+pub fn all_source_files(root_dir: &Path) -> Result<Workspace, CompileError> {
     let mut slug_exts = HashMap::new();
     let to_slug_ext = |p: &Path| {
         let p = p.strip_prefix(root_dir).unwrap_or(p);
@@ -114,14 +95,14 @@ pub fn all_source_files(root_dir: &Path) -> Result<Workspace, std::io::Error> {
         Some((slug, ext?))
     };
 
-    for entry in std::fs::read_dir(root_dir)? {
-        let path = entry?.path();
+    for entry in std::fs::read_dir(root_dir).context(IOSnafu { path: root_dir })? {
+        let path = entry.context(IOSnafu { path: root_dir })?.path();
         if path.is_file() && !should_ignored_file(&path) {
             let Some((slug, ext)) = to_slug_ext(&path) else {
                 continue;
             };
             if let Some(ext) = slug_exts.insert(slug, ext) {
-                return Err(err_collide(&path, &ext));
+                return FileCollisonSnafu { path: &path, ext }.fail();
             };
         } else if path.is_dir() && !should_ignored_dir(&path) {
             for entry in WalkDir::new(&path)
@@ -132,13 +113,16 @@ pub fn all_source_files(root_dir: &Path) -> Result<Workspace, std::io::Error> {
                     path.is_file() || !should_ignored_dir(path)
                 })
             {
-                let path = entry?.into_path();
+                let path = entry
+                    .map_err(|e| e.into())
+                    .context(IOSnafu { path: &path })?
+                    .into_path();
                 if path.is_file() {
                     let Some((slug, ext)) = to_slug_ext(&path) else {
                         continue;
                     };
                     if let Some(ext) = slug_exts.insert(slug, ext) {
-                        return Err(err_collide(&path, &ext));
+                        return FileCollisonSnafu { path, ext }.fail();
                     }
                 }
             }

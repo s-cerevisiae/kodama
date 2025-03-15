@@ -1,8 +1,11 @@
+use snafu::{OptionExt, ResultExt};
+
 use super::html_parser::{HTMLParser, HTMLTagKind};
 use super::section::{EmbedContent, LocalLink, SectionOption};
 use super::section::{HTMLContent, HTMLContentBuilder, LazyContent};
-use super::{CompileError, ShallowSection};
+use super::ShallowSection;
 use crate::entry::HTMLMetaData;
+use crate::error::{CompileError, IOSnafu, MissingAttrSnafu, SyntaxSnafu};
 use crate::process::embed_markdown;
 use crate::slug::to_slug;
 use crate::typst_cli;
@@ -31,11 +34,12 @@ fn parse_typst_html(
         cursor = span.end;
 
         let attr = |attr_name: &str| {
-            span.attrs.get(attr_name).ok_or(CompileError::Syntax(
-                Some(concat!(file!(), '#', line!())),
-                Box::new(format!("No attribute '{}' in a kodama tag", attr_name)),
-                relative_path.to_string(),
-            ))
+            span.attrs
+                .get(attr_name)
+                .context(MissingAttrSnafu { attr_name })
+                .context(SyntaxSnafu {
+                    file: relative_path,
+                })
         };
 
         let value = || {
@@ -93,12 +97,8 @@ fn parse_typst_html(
 
 pub fn parse_typst(slug: &str, root_dir: &str) -> Result<ShallowSection, CompileError> {
     let relative_path = format!("{}.typst", slug);
-    let html_str = typst_cli::file_to_html(&relative_path, root_dir).map_err(|e| {
-        CompileError::IO(
-            Some(concat!(file!(), '#', line!())),
-            e,
-            relative_path.to_string(),
-        )
+    let html_str = typst_cli::file_to_html(&relative_path, root_dir).context(IOSnafu {
+        path: &relative_path,
     })?;
 
     let mut metadata: HashMap<String, HTMLContent> = HashMap::new();
