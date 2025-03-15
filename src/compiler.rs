@@ -53,10 +53,10 @@ pub fn compile_all(workspace_dir: &str) -> eyre::Result<()> {
             shallow
         } else {
             let shallow = match ext {
-                Ext::Markdown => parse_markdown(slug).wrap_err("failed to parse markdown file")?,
-                Ext::Typst => {
-                    parse_typst(slug, workspace_dir).wrap_err("failed to parse typst file")?
-                }
+                Ext::Markdown => parse_markdown(slug)
+                    .wrap_err_with(|| eyre!("failed to parse markdown file `{slug}.{ext}`"))?,
+                Ext::Typst => parse_typst(slug, workspace_dir)
+                    .wrap_err_with(|| eyre!("failed to parse typst file `{slug}.{ext}`"))?,
             };
             let serialized = serde_json::to_string(&shallow).unwrap();
             std::fs::write(&entry_path_buf, serialized).wrap_err_with(|| {

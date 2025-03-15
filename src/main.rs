@@ -13,7 +13,7 @@ use config::{output_path, CompileConfig, FooterMode};
 use std::{fs, path::Path};
 
 use clap::Parser;
-use eyre::eyre;
+use eyre::{eyre, WrapErr};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -90,7 +90,7 @@ struct CleanCommand {
     html: bool,
 }
 
-fn main() {
+fn main() -> eyre::Result<()> {
     let cli = Cli::parse();
     match &cli.command {
         Command::Compile(compile_command) => {
@@ -111,15 +111,11 @@ fn main() {
             );
 
             if !compile_command.disable_export_css {
-                export_css_files()
+                export_css_files().wrap_err("failed to export CSS")?;
             }
 
-            if let Err(e) = compiler::compile_all(root) {
-                eprintln!(
-                    "{:#}",
-                    e.wrap_err(eyre!("failed to compile project `{root}`"))
-                );
-            }
+            compiler::compile_all(root)
+                .wrap_err_with(|| eyre!("failed to compile project `{root}`"))?;
         }
         Command::Clean(clean_command) => {
             config::mutex_set(
@@ -157,20 +153,21 @@ fn main() {
             });
         }
     }
+    Ok(())
 }
 
-fn export_css_files() {
-    export_css_file(&html_flake::html_main_style(), "main.css");
-    export_css_file(&&html_flake::html_typst_style(), "typst.css");
+fn export_css_files() -> eyre::Result<()> {
+    export_css_file(html_flake::html_main_style(), "main.css")?;
+    export_css_file(html_flake::html_typst_style(), "typst.css")?;
+    Ok(())
 }
 
-fn export_css_file(css_content: &str, name: &str) {
+fn export_css_file(css_content: &str, name: &str) -> eyre::Result<()> {
     let path = output_path(name);
     let path = std::path::Path::new(&path);
     if !path.exists() {
-        match fs::write(path, css_content) {
-            Err(err) => eprintln!("{:?}", err),
-            Ok(_) => (),
-        }
+        fs::write(path, css_content)
+            .wrap_err_with(|| eyre!("failed to write CSS file to `{}`", path.display()))?;
     }
+    Ok(())
 }
