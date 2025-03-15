@@ -98,7 +98,7 @@ fn parse_typst_html(
 pub fn parse_typst(slug: &str, root_dir: &str) -> Result<ShallowSection, CompileError> {
     let relative_path = format!("{}.typst", slug);
     let html_str = typst_cli::file_to_html(&relative_path, root_dir).context(IOSnafu {
-        file: &relative_path,
+        path: &relative_path,
     })?;
 
     let mut metadata: HashMap<String, HTMLContent> = HashMap::new();

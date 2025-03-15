@@ -32,7 +32,7 @@ pub fn initialize(
     std::fs::read_to_string(&markdown_path)
         .map(|markdown_input| (markdown_input, metadata, recorder))
         .context(IOSnafu {
-            file: &markdown_path,
+            path: &markdown_path,
         })
 }
 
