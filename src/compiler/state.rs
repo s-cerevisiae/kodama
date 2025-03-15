@@ -30,7 +30,7 @@ impl CompileState {
         }
     }
 
-    pub fn compile(&mut self, slug: &str) -> &Section {
+    fn compile(&mut self, slug: &str) -> &Section {
         self.fetch_section(slug).unwrap()
     }
 
@@ -174,7 +174,7 @@ impl CompileState {
         self.compiled.get(&slug).unwrap()
     }
 
-    pub fn metadata_to_section(content: &HTMLContent, current_slug: &str) -> ShallowSection {
+    fn metadata_to_section(content: &HTMLContent, current_slug: &str) -> ShallowSection {
         let mut metadata = HashMap::new();
         metadata.insert(
             KEY_SLUG.to_string(),
@@ -187,18 +187,18 @@ impl CompileState {
         };
     }
 
-    pub fn get_metadata(&self, slug: &str) -> Option<&HTMLMetaData> {
+    fn get_metadata(&self, slug: &str) -> Option<&HTMLMetaData> {
         self.metadata.get(slug)
     }
 
-    pub fn is_enable_backlinks(&self, slug: &str) -> bool {
+    fn is_enable_backlinks(&self, slug: &str) -> bool {
         self.metadata
             .get(slug)
             .map(|e| e.is_enable_backlinks())
             .unwrap_or(true)
     }
 
-    pub fn is_reference(&self, slug: &str) -> bool {
+    fn is_reference(&self, slug: &str) -> bool {
         self.metadata
             .get(slug)
             .map(|e| e.is_asref() || Taxon::is_reference(e.data_taxon().map_or("", String::as_str)))
