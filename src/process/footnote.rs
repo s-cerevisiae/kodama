@@ -1,6 +1,6 @@
 use pulldown_cmark::{CowStr, Tag};
 
-use crate::{html, recorder::ParseRecorder};
+use crate::{html_macro::html, recorder::ParseRecorder};
 
 use super::processer::Processer;
 
@@ -17,8 +17,9 @@ impl Processer for Footnote {
         let number = recorder.footnote_counter.entry(name.into()).or_insert(len);
         let id = get_back_id(s);
 
-        let html = html!(sup class="footnote-reference", id={id} => 
-          (html!(a href={format!("#{}", s)} => {number})));
+        let html = html!(sup class="footnote-reference", id={id} => {
+          a href={format!("#{}", s)} => { (number) }
+        });
         Some(html)
     }
 
@@ -33,9 +34,7 @@ impl Processer for Footnote {
                 let html = format!(
                     r#"<div class="footnote-definition" id="{}">
   <sup class="footnote-definition-label"><a href="{}">{}</a></sup>"#,
-                    s,
-                    back_href, 
-                    number
+                    s, back_href, number
                 );
                 recorder.push(html);
             }

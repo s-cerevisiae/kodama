@@ -2,7 +2,8 @@ use std::{fs, path::Path, process::Command};
 
 use crate::{
     config::{self, verify_and_file_hash},
-    html, html_flake,
+    html_flake,
+    html_macro::html,
 };
 
 pub fn source_to_inline_html(typst_path: &str, html_path: &str) -> Result<String, std::io::Error> {
@@ -68,7 +69,7 @@ pub fn source_to_inline_svg(src: &str, config: InlineConfig) -> Result<String, s
 
     Ok(format!(
         "\n{}\n",
-        html!(span class = "inline-typst" => {svg})
+        html!(span class = "inline-typst" => { (svg) })
     ))
 }
 
@@ -207,8 +208,7 @@ fn thematize(s: std::borrow::Cow<'_, str>) -> String {
 fn failed_in_file(src_pos: &'static str, file_path: &str, stderr: std::borrow::Cow<'_, str>) {
     eprintln!(
         "Command failed in {}: \n  In file {}, {}",
-        src_pos,
-        file_path,
-        stderr
+        src_pos, file_path, stderr
     );
 }
+

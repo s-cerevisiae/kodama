@@ -1,7 +1,8 @@
 use crate::{
     compiler::{section::HTMLContent, taxon::Taxon},
-    config, html,
+    config,
     html_flake::html_entry_header,
+    html_macro::html,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map::Keys, HashMap};
@@ -180,12 +181,14 @@ impl EntryMetaData {
         let slug_url = config::full_html_url(&slug);
         let span_class: Vec<String> = vec!["taxon".to_string()];
 
-        html!(header =>
-          (html!(h1 =>
-            (html!(span class = {span_class.join(" ")} => {taxon}))
-            {title} {" "}
-            (html!(a class = "slug", href = {slug_url} => "["{&slug_text}"]"))))
-          (html!(html_entry_header(self.etc()))))
+        html!(header => {
+            h1 => {
+                span class = {span_class.join(" ")} => { (taxon) }
+                (title) " "
+                a class = "slug", href = {slug_url} => { "["(slug_text)"]" }
+            }
+            (html_entry_header(self.etc()))
+        })
     }
 
     /// hidden suffix `/index` in slug text.
