@@ -30,7 +30,7 @@ pub struct CompileConfig<S> {
     pub short_slug: bool,
     pub footer_mode: FooterMode,
 
-    /// This is very useful for users who want to modify existing styles or configure other themes.
+    /// `false`: This is very useful for users who want to modify existing styles or configure other themes.
     pub disable_export_css: bool,
 }
 

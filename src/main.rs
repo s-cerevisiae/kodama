@@ -47,18 +47,18 @@ struct CompileCommand {
     root: String,
 
     /// Disable pretty urls (`/page` to `/page.html`)
-    #[arg(short, long, default_value_t = false)]
+    #[arg(short, long)]
     disable_pretty_urls: bool,
 
     /// Hide parents part in slug (e.g. `tutorials/install` to `install`)
-    #[arg(short, long, default_value_t = config::DEFAULT_CONFIG.short_slug)]
+    #[arg(short, long)]
     short_slug: bool,
 
     /// Specify the inline mode for the footer sections
     #[arg(short, long, default_value_t = FooterMode::Link)]
     footer_mode: FooterMode,
 
-    /// Disable exporting the `main.css` file to the output directory.
+    /// Disable exporting the `*.css` file to the output directory.
     #[arg(long)]
     disable_export_css: bool,
 }
