@@ -48,13 +48,8 @@ pub fn html_section(
     }
     let data_taxon = data_taxon.map_or("", |s| s);
     let open = open.then(|| "open").unwrap_or("");
-    let inner_html = format!("{}{}", (html!(summary => {summary})), content);
-    let html_details = format!(
-        r#"
-      <details id="{}" {}>{}</details>
-    "#,
-        id, open, inner_html
-    );
+    let inner_html = format!("{}{}", (html!(summary id={id} => {summary})), content);
+    let html_details = format!("<details {}>{}</details>", open, inner_html);
     html!(section class = {class_name.join(" ")}, data_taxon = {data_taxon} => {html_details})
 }
 
@@ -81,7 +76,7 @@ pub fn catalog_item(
 ) -> String {
     let slug_url = config::full_html_url(slug);
     let title_text = format!("{} [{}]", page_title, slug);
-    let onclick = format!("window.location.href='#{}'", crate::slug::to_hash_id(slug)); // #id
+    let onclick = format!("window.location.href='#{}'", crate::slug::to_hash_id(slug));
 
     let mut class_name: Vec<String> = vec![];
     if !details_open {
