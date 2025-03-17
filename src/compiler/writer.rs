@@ -4,8 +4,8 @@ use crate::{
     compiler::counter::Counter,
     config::{self, verify_update_hash},
     entry::MetaData,
-    html,
     html_flake::{self, html_article_inner},
+    html_macro::html,
 };
 
 use super::{
@@ -130,7 +130,7 @@ impl Writer {
             })
             .unwrap_or_default();
 
-        html!(footer => (references_html) (backlinks_html))
+        html!(footer { (references_html) (backlinks_html) })
     }
 
     fn clip_metadata_badge(slug: &str) -> String {
@@ -141,8 +141,10 @@ impl Writer {
     }
 
     fn catalog_block(items: &str) -> String {
-        html!(div class = "block" =>
-          (html!(h1 => "Table of Contents")) (items))
+        html!(div class="block" {
+          h1 { "Table of Contents" }
+          (items)
+        })
     }
 
     fn catalog_item(section: &Section, taxon: &str, child_html: &str) -> String {
