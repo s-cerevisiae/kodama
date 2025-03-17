@@ -6,7 +6,7 @@
 /// ```
 macro_rules! html_write {
     // Match a single HTML element with attributes and children
-    ($str:expr; $tag:ident $($attr:ident = $val:expr),* => { $($inner:tt)* } $($rest:tt)*) => {
+    ($str:expr; $tag:ident $($attr:ident = $val:tt)* { $($inner:tt)* } $($rest:tt)*) => {
         write!($str, "<{}", stringify!($tag)).unwrap();
 
         // Add attributes
@@ -49,8 +49,9 @@ macro_rules! html_write {
 /// Example:
 /// ```rust
 /// let value = 1;
+/// let id = "some_id";
 /// let html = html!(
-///     p class="c",id="id" => { (value) }
+///     p class="c" id=(id.to_string()) { (value) }
 ///     br
 ///     "abc"
 /// );

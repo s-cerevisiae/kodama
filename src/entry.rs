@@ -181,11 +181,11 @@ impl EntryMetaData {
         let slug_url = config::full_html_url(&slug);
         let span_class: Vec<String> = vec!["taxon".to_string()];
 
-        html!(header => {
-            h1 => {
-                span class = {span_class.join(" ")} => { (taxon) }
+        html!(header {
+            h1 {
+                span class={span_class.join(" ")} { (taxon) }
                 (title) " "
-                a class = "slug", href = {slug_url} => { "["(slug_text)"]" }
+                a class="slug" href={slug_url} { "["(slug_text)"]" }
             }
             (html_entry_header(self.etc()))
         })

@@ -17,8 +17,8 @@ impl Processer for Footnote {
         let number = recorder.footnote_counter.entry(name.into()).or_insert(len);
         let id = get_back_id(s);
 
-        let html = html!(sup class="footnote-reference", id={id} => {
-          a href={format!("#{}", s)} => { (number) }
+        let html = html!(sup class="footnote-reference" id={id} {
+          a href={format!("#{}", s)} { (number) }
         });
         Some(html)
     }

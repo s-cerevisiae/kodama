@@ -69,7 +69,7 @@ pub fn source_to_inline_svg(src: &str, config: InlineConfig) -> Result<String, s
 
     Ok(format!(
         "\n{}\n",
-        html!(span class = "inline-typst" => { (svg) })
+        html!(span class="inline-typst" { (svg) })
     ))
 }
 
