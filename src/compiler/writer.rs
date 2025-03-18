@@ -4,8 +4,7 @@ use crate::{
     compiler::counter::Counter,
     config::{self, verify_update_hash},
     entry::MetaData,
-    html_flake::{self, html_article_inner},
-    html_macro::html,
+    html_flake,
 };
 
 use super::{
@@ -56,7 +55,7 @@ impl Writer {
         let catalog_html = items
             .is_empty()
             .not()
-            .then(|| Writer::catalog_block(&items))
+            .then(|| html_flake::html_catalog_block(&items))
             .unwrap_or_default();
 
         let slug = section.slug();
@@ -130,7 +129,7 @@ impl Writer {
             })
             .unwrap_or_default();
 
-        html!(footer { (references_html) (backlinks_html) })
+        html_flake::html_footer(&references_html, &backlinks_html)
     }
 
     fn clip_metadata_badge(slug: &str) -> String {
@@ -138,13 +137,6 @@ impl Writer {
             true => slug[0..slug.len() - ":metadata".len()].to_string(),
             false => slug.to_string(),
         }
-    }
-
-    fn catalog_block(items: &str) -> String {
-        html!(div class="block" {
-          h1 { "Table of Contents" }
-          (items)
-        })
     }
 
     fn catalog_item(section: &Section, taxon: &str, child_html: &str) -> String {
@@ -184,7 +176,14 @@ impl Writer {
                         .reduce(|s, t| s + &t)
                         .unwrap(),
                 };
-                html_article_inner(&section.metadata, &contents, false, false, None, None)
+                html_flake::html_article_inner(
+                    &section.metadata,
+                    &contents,
+                    false,
+                    false,
+                    None,
+                    None,
+                )
             }
         }
     }
@@ -231,7 +230,7 @@ impl Writer {
                 .unwrap_or(String::new()),
         };
 
-        let article_inner = html_article_inner(
+        let article_inner = html_flake::html_article_inner(
             &section.metadata,
             &contents,
             hide_metadata,

@@ -3,7 +3,6 @@ use std::{fs, path::Path, process::Command};
 use crate::{
     config::{self, verify_and_file_hash},
     html_flake,
-    html_macro::html,
 };
 
 pub fn source_to_inline_html(typst_path: &str, html_path: &str) -> Result<String, std::io::Error> {
@@ -67,10 +66,7 @@ pub fn source_to_inline_svg(src: &str, config: InlineConfig) -> Result<String, s
     );
     let svg = source_to_svg(format!("{}{}", styles, src).as_str(), &config.root_dir)?;
 
-    Ok(format!(
-        "\n{}\n",
-        html!(span class="inline-typst" { (svg) })
-    ))
+    Ok(format!("\n{}\n", html_flake::html_inline_typst_span(&svg)))
 }
 
 pub fn source_to_html(full_path: &str, root_dir: &str) -> Result<String, std::io::Error> {
@@ -211,4 +207,3 @@ fn failed_in_file(src_pos: &'static str, file_path: &str, stderr: std::borrow::C
         src_pos, file_path, stderr
     );
 }
-

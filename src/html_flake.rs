@@ -53,10 +53,9 @@ pub fn html_section(
     html!(section class={class_name.join(" ")} data_taxon={data_taxon} { (html_details) })
 }
 
-pub fn html_entry_header(mut etc: Vec<String>) -> String {
+pub fn html_header_metadata(mut etc: Vec<String>) -> String {
     let mut meta_items: Vec<String> = vec![];
     meta_items.append(&mut etc);
-
     let items = meta_items
         .iter()
         .map(|item| html!(li class="meta-item" { (item) }))
@@ -64,6 +63,24 @@ pub fn html_entry_header(mut etc: Vec<String>) -> String {
         .unwrap_or(String::new());
 
     html!(div class="metadata" { ul { (items) } })
+}
+
+pub fn html_header(
+    title: &str,
+    taxon: &str,
+    slug_url: &str,
+    slug_text: &str,
+    span_class: String,
+    etc: Vec<String>,
+) -> String {
+    html!(header {
+        h1 {
+            span class={span_class} { (taxon) }
+            (title) " "
+            a class="slug" href={slug_url} { "["(slug_text)"]" }
+        }
+        (html_header_metadata(etc))
+    })
 }
 
 pub fn catalog_item(
@@ -90,6 +107,24 @@ pub fn catalog_item(
             (title)
         }
         (child_html)
+    })
+}
+
+pub fn html_catalog_block(items: &str) -> String {
+    html!(div class="block" { h1 { "Table of Contents" } (items) })
+}
+
+pub fn html_inline_typst_span(svg: &str) -> String {
+    html!(span class="inline-typst" { (svg) })
+}
+
+pub fn html_footer(references_html: &str, backlinks_html: &str) -> String {
+    html!(footer { (references_html) (backlinks_html) })
+}
+
+pub fn footnote_reference(s: &str, back_id: &str, number: usize) -> String {
+    html!(sup class="footnote-reference" id={back_id} {
+      a href={format!("#{}", s)} { (number) }
     })
 }
 
