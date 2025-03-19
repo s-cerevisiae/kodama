@@ -19,14 +19,14 @@ use writer::Writer;
 
 use crate::{
     config::{self, verify_and_file_hash},
-    slug::{self, Ext},
+    slug::{self, Ext, Slug},
 };
 
 pub fn compile_all(workspace_dir: &str) -> eyre::Result<()> {
     let workspace = all_source_files(Path::new(workspace_dir))?;
     let mut shallows = HashMap::new();
 
-    for (slug, ext) in &workspace.slug_exts {
+    for (&slug, &ext) in &workspace.slug_exts {
         let relative_path = format!("{}.{}", slug, ext);
 
         let is_modified = verify_and_file_hash(&relative_path)
@@ -65,13 +65,13 @@ pub fn compile_all(workspace_dir: &str) -> eyre::Result<()> {
             shallow
         };
 
-        shallows.insert(slug.to_string(), shallow);
+        shallows.insert(slug, shallow);
     }
 
     let state = state::compile_all(shallows)?;
 
     Writer::write_needed_slugs(
-        &workspace.slug_exts.into_iter().map(|x| x.0).collect(),
+        workspace.slug_exts.into_iter().map(|x| x.0),
         &state,
     );
 
@@ -146,5 +146,5 @@ pub fn all_source_files(root_dir: &Path) -> eyre::Result<Workspace> {
 
 #[derive(Debug)]
 pub struct Workspace {
-    pub slug_exts: HashMap<String, Ext>,
+    pub slug_exts: HashMap<Slug, Ext>,
 }
