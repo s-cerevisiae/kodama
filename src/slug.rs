@@ -93,17 +93,7 @@ pub fn to_hash_id(slug_str: &str) -> String {
 /// path to slug
 pub fn to_slug(fullname: &str) -> Slug {
     let path = Path::new(fullname);
-    let slug = strip_base(path).with_extension("");
-    Slug::new(pretty_path(&slug))
-}
-
-/// Strip `./` or `/` from a `Path` if exists.
-/// Works on both Windows and \*nix.
-fn strip_base(path: &Path) -> &Path {
-    path
-        .strip_prefix("./")
-        .or_else(|_| path.strip_prefix("/"))
-        .unwrap_or(path)
+    Slug::new(pretty_path(&path.with_extension("")))
 }
 
 pub fn pretty_path(path: &std::path::Path) -> String {
@@ -118,7 +108,7 @@ fn clean_path(path: &std::path::Path) -> std::path::PathBuf {
     let mut cleaned_path = std::path::PathBuf::new();
     for component in path.components() {
         match component {
-            std::path::Component::CurDir => {}
+            std::path::Component::RootDir | std::path::Component::CurDir => {}
             std::path::Component::ParentDir => {
                 cleaned_path.pop();
             }
