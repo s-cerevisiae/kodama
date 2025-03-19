@@ -3,8 +3,7 @@ use std::{fmt::Display, path::Path, str::FromStr};
 use internment::Intern;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
-#[serde(from = "String")]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Slug(Intern<str>);
 
 impl Slug {
@@ -14,12 +13,6 @@ impl Slug {
 
     pub fn as_str(&self) -> &'static str {
         self.0.as_ref()
-    }
-}
-
-impl From<String> for Slug {
-    fn from(value: String) -> Self {
-        Self::new(value)
     }
 }
 
@@ -47,6 +40,15 @@ impl Serialize for Slug {
         S: serde::Serializer,
     {
         serializer.serialize_str(self.0.as_ref())
+    }
+}
+
+impl<'de> Deserialize<'de> for Slug {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        String::deserialize(deserializer).map(Slug::new)
     }
 }
 
