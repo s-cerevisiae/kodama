@@ -92,20 +92,18 @@ pub fn to_hash_id(slug_str: &str) -> String {
 
 /// path to slug
 pub fn to_slug(fullname: &str) -> Slug {
-    path_to_slug(Path::new(fullname)).0
+    let path = Path::new(fullname);
+    let slug = strip_base(path).with_extension("");
+    Slug::new(pretty_path(&slug))
 }
 
-pub fn path_to_slug(path: &Path) -> (Slug, Option<Ext>) {
-    let slug = path
-        // this works for both windows and unix
+/// Strip `./` or `/` from a `Path` if exists.
+/// Works on both Windows and \*nix.
+fn strip_base(path: &Path) -> &Path {
+    path
         .strip_prefix("./")
         .or_else(|_| path.strip_prefix("/"))
-        .unwrap_or(path);
-    let ext = slug
-        .extension()
-        .and_then(|e| e.to_str())
-        .and_then(|e| e.parse().ok());
-    (Slug::new(pretty_path(&slug.with_extension(""))), ext)
+        .unwrap_or(path)
 }
 
 pub fn pretty_path(path: &std::path::Path) -> String {

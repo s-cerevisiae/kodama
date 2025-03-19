@@ -70,10 +70,7 @@ pub fn compile_all(workspace_dir: &str) -> eyre::Result<()> {
 
     let state = state::compile_all(shallows)?;
 
-    Writer::write_needed_slugs(
-        workspace.slug_exts.into_iter().map(|x| x.0),
-        &state,
-    );
+    Writer::write_needed_slugs(workspace.slug_exts.into_iter().map(|x| x.0), &state);
 
     Ok(())
 }
@@ -96,8 +93,9 @@ pub fn all_source_files(root_dir: &Path) -> eyre::Result<Workspace> {
     let mut slug_exts = HashMap::new();
     let to_slug_ext = |p: &Path| {
         let p = p.strip_prefix(root_dir).unwrap_or(p);
-        let (slug, ext) = slug::path_to_slug(p);
-        Some((slug, ext?))
+        let ext = p.extension()?.to_str()?.parse().ok()?;
+        let slug = Slug::new(slug::pretty_path(&p.with_extension("")));
+        Some((slug, ext))
     };
 
     let failed_to_read_dir = |dir: &Path| eyre!("failed to read directory `{}`", dir.display());
